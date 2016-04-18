@@ -14,23 +14,17 @@ struct RegexParser {
     "((https?://|www.|pic.)[-\\w;/?:@&=+$\\|\\_.!~*\\|'()\\[\\]%#,☺]+[\\w/#](\\(\\))?)" +
     "(?=$|[\\s',\\|\\(\\).:;?\\-\\[\\]>\\)])"
     
-    static let hashtagRegex = try? NSRegularExpression(pattern: "(?:^|\\s|$)#[\\p{L}0-9_]*", options: [.CaseInsensitive])
-    static let mentionRegex = try? NSRegularExpression(pattern: "(?:^|\\s|$|[.])@[\\p{L}0-9_]*", options: [.CaseInsensitive]);
     static let urlDetector = try? NSRegularExpression(pattern: urlPattern, options: [.CaseInsensitive])
-    
-    static func getMentions(fromText text: String, range: NSRange) -> [NSTextCheckingResult] {
-        guard let mentionRegex = mentionRegex else { return [] }
-        return mentionRegex.matchesInString(text, options: [], range: range)
-    }
-    
-    static func getHashtags(fromText text: String, range: NSRange) -> [NSTextCheckingResult] {
-        guard let hashtagRegex = hashtagRegex else { return [] }
-        return hashtagRegex.matchesInString(text, options: [], range: range)
-    }
+    static let phoneDetector = try? NSDataDetector(types: NSTextCheckingType.PhoneNumber.rawValue)
     
     static func getURLs(fromText text: String, range: NSRange) -> [NSTextCheckingResult] {
         guard let urlDetector = urlDetector else { return [] }
         return urlDetector.matchesInString(text, options: [], range: range)
+    }
+    
+    static func getPhoneNumbers(fromText text: String, range: NSRange) -> [NSTextCheckingResult] {
+        guard let phoneDetector = phoneDetector else { return [] }
+        return phoneDetector.matchesInString(text, options: [], range: range)
     }
     
 }

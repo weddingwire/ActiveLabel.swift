@@ -13,8 +13,6 @@ extension ActiveElement: Equatable {}
 
 func ==(a: ActiveElement, b: ActiveElement) -> Bool {
     switch (a, b) {
-    case (.Mention(let a), .Mention(let b)) where a == b: return true
-    case (.Hashtag(let a), .Hashtag(let b)) where a == b: return true
     case (.URL(let a), .URL(let b)) where a == b: return true
     case (.None, .None): return true
     default: return false
@@ -32,12 +30,10 @@ class ActiveTypeTests: XCTestCase {
     var currentElementString: String {
         let currentElement = activeElements.first!
         switch currentElement {
-        case .Mention(let mention):
-            return mention
-        case .Hashtag(let hashtag):
-            return hashtag
         case .URL(let url):
             return url
+        case .Phone(let number):
+            return number
         case .None:
             return ""
         }
@@ -46,12 +42,10 @@ class ActiveTypeTests: XCTestCase {
     var currentElementType: ActiveType {
         let currentElement = activeElements.first!
         switch currentElement {
-        case .Mention:
-            return .Mention
-        case .Hashtag:
-            return .Hashtag
         case .URL:
             return .URL
+        case .Phone:
+            return .Phone
         case .None:
             return .None
         }
@@ -77,102 +71,6 @@ class ActiveTypeTests: XCTestCase {
         label.text = "ಠ_ಠ"
         XCTAssertEqual(activeElements.count, 0)
         label.text = "😁"
-        XCTAssertEqual(activeElements.count, 0)
-    }
-    
-    func testMention() {
-        label.text = "@userhandle"
-        XCTAssertEqual(activeElements.count, 1)
-        XCTAssertEqual(currentElementString, "userhandle")
-        XCTAssertEqual(currentElementType, ActiveType.Mention)
-        
-        label.text = "@userhandle."
-        XCTAssertEqual(activeElements.count, 1)
-        XCTAssertEqual(currentElementString, "userhandle")
-        XCTAssertEqual(currentElementType, ActiveType.Mention)
-
-        label.text = "@_with_underscores_"
-        XCTAssertEqual(activeElements.count, 1)
-        XCTAssertEqual(currentElementString, "_with_underscores_")
-        XCTAssertEqual(currentElementType, ActiveType.Mention)
-        
-        label.text = " . @userhandle"
-        XCTAssertEqual(activeElements.count, 1)
-        XCTAssertEqual(currentElementString, "userhandle")
-        XCTAssertEqual(currentElementType, ActiveType.Mention)
-        
-        label.text = "@user#hashtag"
-        XCTAssertEqual(activeElements.count, 1)
-        XCTAssertEqual(currentElementString, "user")
-        XCTAssertEqual(currentElementType, ActiveType.Mention)
-        
-        label.text = "@user@mention"
-        XCTAssertEqual(activeElements.count, 1)
-        XCTAssertEqual(currentElementString, "user")
-        XCTAssertEqual(currentElementType, ActiveType.Mention)
-        
-        label.text = ".@userhandle"
-        XCTAssertEqual(activeElements.count, 1)
-        XCTAssertEqual(currentElementString, "userhandle")
-        XCTAssertEqual(currentElementType, ActiveType.Mention)
-        
-        label.text = " .@userhandle"
-        XCTAssertEqual(activeElements.count, 1)
-        XCTAssertEqual(currentElementString, "userhandle")
-        XCTAssertEqual(currentElementType, ActiveType.Mention)
-
-        label.text = "word@mention"
-        XCTAssertEqual(activeElements.count, 0)
-        label.text = "@u"
-        XCTAssertEqual(activeElements.count, 0)
-        label.text = "@."
-        XCTAssertEqual(activeElements.count, 0)
-        label.text = "@"
-        XCTAssertEqual(activeElements.count, 0)
-    }
-    
-    func testHashtag() {
-        label.text = "#somehashtag"
-        XCTAssertEqual(activeElements.count, 1)
-        XCTAssertEqual(currentElementString, "somehashtag")
-        XCTAssertEqual(currentElementType, ActiveType.Hashtag)
-
-        label.text = "#somehashtag."
-        XCTAssertEqual(activeElements.count, 1)
-        XCTAssertEqual(currentElementString, "somehashtag")
-        XCTAssertEqual(currentElementType, ActiveType.Hashtag)
-
-        label.text = "#_with_underscores_"
-        XCTAssertEqual(activeElements.count, 1)
-        XCTAssertEqual(currentElementString, "_with_underscores_")
-        XCTAssertEqual(currentElementType, ActiveType.Hashtag)
-        
-        label.text = " . #somehashtag"
-        XCTAssertEqual(activeElements.count, 1)
-        XCTAssertEqual(currentElementString, "somehashtag")
-        XCTAssertEqual(currentElementType, ActiveType.Hashtag)
-        
-        label.text = "#some#hashtag"
-        XCTAssertEqual(activeElements.count, 1)
-        XCTAssertEqual(currentElementString, "some")
-        XCTAssertEqual(currentElementType, ActiveType.Hashtag)
-        
-        label.text = "#some@mention"
-        XCTAssertEqual(activeElements.count, 1)
-        XCTAssertEqual(currentElementString, "some")
-        XCTAssertEqual(currentElementType, ActiveType.Hashtag)
-        
-        label.text = ".#somehashtag"
-        XCTAssertEqual(activeElements.count, 0)
-        label.text = " .#somehashtag"
-        XCTAssertEqual(activeElements.count, 0)
-        label.text = "word#hashtag"
-        XCTAssertEqual(activeElements.count, 0)
-        label.text = "#h"
-        XCTAssertEqual(activeElements.count, 0)
-        label.text = "#."
-        XCTAssertEqual(activeElements.count, 0)
-        label.text = "#"
         XCTAssertEqual(activeElements.count, 0)
     }
     
@@ -205,16 +103,28 @@ class ActiveTypeTests: XCTestCase {
         label.text = "google.com"
         XCTAssertEqual(activeElements.count, 0)
     }
-
-    func testFiltering() {
-        label.text = "@user #tag"
-        XCTAssertEqual(activeElements.count, 2)
-
-        label.filterMention { $0 != "user" }
+    
+    func testPhoneNumbers() {
+        label.text = "1-800-555-5555"
         XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementType, ActiveType.Phone)
+        
+        label.text = "301.987.6543"
+        XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementType, ActiveType.Phone)
+        
+        label.text = "1-800-COMCAST"
+        XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementType, ActiveType.Phone)
+        
+        label.text = "+1-(800)-555-2468"
+        XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementType, ActiveType.Phone)
 
-        label.filterHashtag { $0 != "tag" }
-        XCTAssertEqual(activeElements.count, 0)
+        label.text = "8473292"
+        XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementType, ActiveType.Phone)
     }
+
     
 }
