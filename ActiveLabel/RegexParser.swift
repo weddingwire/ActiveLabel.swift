@@ -11,7 +11,7 @@ import Foundation
 struct RegexParser {
     
     static let urlPattern = "(^|[\\s.:;?\\-\\]<\\(])" +
-        "((https?://|www.|pic.)[-\\w;/?:@&=+$\\|\\_.!~*\\|'()\\[\\]%#,☺]+[\\w/#](\\(\\))?)" +
+    "((https?://|www.|pic.)[-\\w;/?:@&=+$\\|\\_.!~*\\|'()\\[\\]%#,☺]+[\\w/#](\\(\\))?)" +
     "(?=$|[\\s',\\|\\(\\).:;?\\-\\[\\]>\\)])"
     
     static let urlDetector = try? NSRegularExpression(pattern: urlPattern, options: [.CaseInsensitive])
