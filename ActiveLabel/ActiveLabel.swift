@@ -17,6 +17,7 @@ public protocol ActiveLabelDelegate: class {
     
     // MARK: - public properties
     public weak var delegate: ActiveLabelDelegate?
+    public var highlightColor: UIColor = UIColor.lightGrayColor()
     
     @IBInspectable public var URLColor: UIColor = .blueColor() {
         didSet { updateTextStorage(parseText: false) }
@@ -31,6 +32,10 @@ public protocol ActiveLabelDelegate: class {
     // MARK: - public methods
     public func handleURLTap(handler: (NSURL) -> ()) {
         urlTapHandler = handler
+    }
+    
+    public var copyable: Bool? {
+        didSet { updateTextStorage(parseText: false) }
     }
     
     // MARK: - override UILabel properties
@@ -65,6 +70,48 @@ public protocol ActiveLabelDelegate: class {
         super.init(coder: aDecoder)
         _customizing = false
         setupLabel()
+    }
+    
+    func setupTap() {
+        userInteractionEnabled = true
+        addGestureRecognizer(UILongPressGestureRecognizer(target: self, action: #selector(ActiveLabel.showMenu(_:))))
+        NSNotificationCenter.defaultCenter().addObserver(self, selector: #selector(ActiveLabel.hideEditMenu), name: UIMenuControllerWillHideMenuNotification, object: nil)
+    }
+    
+    deinit {
+        NSNotificationCenter.defaultCenter().removeObserver(self)
+    }
+    
+    func showMenu(sender: AnyObject?) {
+        becomeFirstResponder()
+        let menu = UIMenuController.sharedMenuController()
+        if !menu.menuVisible {
+            backgroundColor = highlightColor
+            menu.setTargetRect(bounds, inView: self)
+            menu.setMenuVisible(true, animated: true)
+        }
+    }
+    
+    public override func copy(sender: AnyObject?) {
+        let board = UIPasteboard.generalPasteboard()
+        board.string = text
+        let menu = UIMenuController.sharedMenuController()
+        menu.setMenuVisible(false, animated: true)
+    }
+    
+    public override func canBecomeFirstResponder() -> Bool {
+        return true
+    }
+    
+    public override func canPerformAction(action: Selector, withSender sender: AnyObject?) -> Bool {
+        if action == #selector(NSObject.copy(_:)) {
+            return true
+        }
+        return false
+    }
+    
+    func hideEditMenu() {
+        backgroundColor = UIColor.clearColor()
     }
     
     public override func drawTextInRect(rect: CGRect) {
@@ -160,6 +207,10 @@ public protocol ActiveLabelDelegate: class {
         guard let attributedText = attributedText
             where attributedText.length > 0 else {
                 return
+        }
+        
+        if copyable ?? false {
+            setupTap()
         }
         
         let mutAttrString = addLineBreak(attributedText)
