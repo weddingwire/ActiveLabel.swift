@@ -58,14 +58,22 @@ public protocol ActiveLabelDelegate: class {
     override open var textAlignment: NSTextAlignment {
         didSet { updateTextStorage(parseText: false)}
     }
-    
+
+    open override var numberOfLines: Int {
+        didSet { textContainer.maximumNumberOfLines = numberOfLines }
+    }
+
+    open override var lineBreakMode: NSLineBreakMode {
+        didSet { textContainer.lineBreakMode = lineBreakMode }
+    }
+
     // MARK: - init functions
     override public init(frame: CGRect) {
         super.init(frame: frame)
         _customizing = false
         setupLabel()
     }
-    
+
     required public init?(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
         _customizing = false
@@ -116,15 +124,15 @@ public protocol ActiveLabelDelegate: class {
     
     open override func drawText(in rect: CGRect) {
         let range = NSRange(location: 0, length: textStorage.length)
-        
+
         textContainer.size = rect.size
         let newOrigin = textOrigin(inRect: rect)
         
         layoutManager.drawBackground(forGlyphRange: range, at: newOrigin)
         layoutManager.drawGlyphs(forGlyphRange: range, at: newOrigin)
     }
-    
-    
+
+
     // MARK: - customzation
     open func customize(_ block: (_ label: ActiveLabel) -> ()) -> ActiveLabel{
         _customizing = true
@@ -138,7 +146,7 @@ public protocol ActiveLabelDelegate: class {
     func onTouch(_ touch: UITouch) -> Bool {
         let location = touch.location(in: self)
         var avoidSuperCall = false
-        
+
         switch touch.phase {
         case .began, .moved:
             if let element = elementAtLocation(location) {
@@ -154,7 +162,7 @@ public protocol ActiveLabelDelegate: class {
             }
         case .ended:
             guard let selectedElement = selectedElement else { return avoidSuperCall }
-            
+
             switch selectedElement.element {
             case .url(let url): didTapStringURL(url)
             case .phone(let number): didTapPhoneNumber(number)
@@ -173,10 +181,10 @@ public protocol ActiveLabelDelegate: class {
         case .stationary:
             break
         }
-        
+
         return avoidSuperCall
     }
-    
+
     // MARK: - private properties
     fileprivate var _customizing: Bool = true
     
@@ -193,6 +201,16 @@ public protocol ActiveLabelDelegate: class {
         .phone: []
     ]
     
+    fileprivate var mentionFilterPredicate: ((String) -> Bool)?
+    fileprivate var hashtagFilterPredicate: ((String) -> Bool)?
+
+    fileprivate var selectedElement: ElementTuple?
+    fileprivate var heightCorrection: CGFloat = 0
+    internal lazy var textStorage = NSTextStorage()
+    fileprivate lazy var layoutManager = NSLayoutManager()
+    fileprivate lazy var textContainer = NSTextContainer()
+    lazy var activeElements = [ActiveType: [ElementTuple]]()
+
     // MARK: - helper functions
     fileprivate func setupLabel() {
         textStorage.addLayoutManager(layoutManager)
@@ -211,20 +229,21 @@ public protocol ActiveLabelDelegate: class {
         if copyable ?? false {
             setupTap()
         }
-        
+
         let mutAttrString = addLineBreak(attributedText)
         
         if parseText {
-            selectedElement = nil
-            for (type, _) in activeElements {
-                activeElements[type]?.removeAll()
-            }
-            parseTextAndExtractActiveElements(mutAttrString)
+            clearActiveElements()
+            let newString = parseTextAndExtractActiveElements(mutAttrString)
+            mutAttrString.mutableString.setString(newString)
         }
-        
-        self.addLinkAttribute(mutAttrString)
-        self.textStorage.setAttributedString(mutAttrString)
-        self.setNeedsDisplay()
+
+        addLinkAttribute(mutAttrString)
+        textStorage.setAttributedString(mutAttrString)
+        _customizing = true
+        text = mutAttrString.string
+        _customizing = false
+        setNeedsDisplay()
     }
     
     fileprivate func textOrigin(inRect rect: CGRect) -> CGPoint {
@@ -233,7 +252,7 @@ public protocol ActiveLabelDelegate: class {
         let glyphOriginY = heightCorrection > 0 ? rect.origin.y + heightCorrection : rect.origin.y
         return CGPoint(x: rect.origin.x, y: glyphOriginY)
     }
-    
+
     /// add link attribute
     fileprivate func addLinkAttribute(_ mutAttrString: NSMutableAttributedString) {
         var range = NSRange(location: 0, length: 0)
@@ -249,12 +268,20 @@ public protocol ActiveLabelDelegate: class {
             case .none: ()
             }
             
+            if let highlightFont = hightlightFont {
+                attributes[NSFontAttributeName] = highlightFont
+            }
+			
+            if let configureLinkAttribute = configureLinkAttribute {
+                attributes = configureLinkAttribute(type, attributes, false)
+            }
+
             for element in elements {
                 mutAttrString.setAttributes(attributes, range: element.range)
             }
         }
     }
-    
+
     /// use regex check all link ranges
     fileprivate func parseTextAndExtractActiveElements(_ attrString: NSAttributedString) {
         let textString = attrString.string
@@ -274,20 +301,18 @@ public protocol ActiveLabelDelegate: class {
     /// add line break mode
     fileprivate func addLineBreak(_ attrString: NSAttributedString) -> NSMutableAttributedString {
         let mutAttrString = NSMutableAttributedString(attributedString: attrString)
-        
+
         var range = NSRange(location: 0, length: 0)
         var attributes = mutAttrString.attributes(at: 0, effectiveRange: &range)
         
         let paragraphStyle = attributes[NSParagraphStyleAttributeName] as? NSMutableParagraphStyle ?? NSMutableParagraphStyle()
         paragraphStyle.lineBreakMode = NSLineBreakMode.byWordWrapping
         paragraphStyle.alignment = textAlignment
-        if let lineSpacing = lineSpacing {
-            paragraphStyle.lineSpacing = CGFloat(lineSpacing)
-        }
-        
+        paragraphStyle.lineSpacing = lineSpacing
+        paragraphStyle.minimumLineHeight = minimumLineHeight > 0 ? minimumLineHeight: self.font.pointSize * 1.14
         attributes[NSParagraphStyleAttributeName] = paragraphStyle
         mutAttrString.setAttributes(attributes, range: range)
-        
+
         return mutAttrString
     }
     
@@ -302,15 +327,25 @@ public protocol ActiveLabelDelegate: class {
             case .url(_), .phone(_): attributes[NSForegroundColorAttributeName] = URLSelectedColor ?? URLColor
             case .none: ()
             }
+            attributes[NSForegroundColorAttributeName] = selectedColor
         } else {
             switch selectedElement.element {
             case .url(_), .phone(_): attributes[NSForegroundColorAttributeName] = URLColor
             case .none: ()
             }
+            attributes[NSForegroundColorAttributeName] = unselectedColor
         }
         
-        textStorage.addAttributes(attributes, range: selectedElement.range)
+        if let highlightFont = hightlightFont {
+            attributes[NSFontAttributeName] = highlightFont
+        }
         
+        if let configureLinkAttribute = configureLinkAttribute {
+            attributes = configureLinkAttribute(type, attributes, isSelected)
+        }
+
+        textStorage.addAttributes(attributes, range: selectedElement.range)
+
         setNeedsDisplay()
     }
     
@@ -325,6 +360,8 @@ public protocol ActiveLabelDelegate: class {
         guard boundingRect.contains(correctLocation) else {
             return nil
         }
+
+        let index = layoutManager.glyphIndex(for: correctLocation, in: textContainer)
         
         let index = layoutManager.glyphIndex(for: correctLocation, in: textContainer)
         
@@ -333,11 +370,11 @@ public protocol ActiveLabelDelegate: class {
                 return element
             }
         }
-        
+
         return nil
     }
-    
-    
+
+
     //MARK: - Handle UI Responder touches
     open override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first else { return }
@@ -356,7 +393,7 @@ public protocol ActiveLabelDelegate: class {
         if onTouch(touch) { return }
         super.touchesEnded(touches, with: event)
     }
-    
+
     //MARK: - ActiveLabel handler
     fileprivate func didTapStringURL(_ stringURL: String) {
         guard let urlHandler = urlTapHandler, let url = URL(string: stringURL) else {
@@ -372,6 +409,14 @@ public protocol ActiveLabelDelegate: class {
             return
         }
         phoneHandler(phoneNumber)
+    }
+
+    fileprivate func didTap(_ element: String, for type: ActiveType) {
+        guard let elementHandler = customTapHandlers[type] else {
+            delegate?.didSelect(element, type: type)
+            return
+        }
+        elementHandler(element)
     }
 }
 

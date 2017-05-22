@@ -33,7 +33,6 @@ struct ActiveBuilder {
             let element = ActiveElement.url(word)
             elements.append((url.range, element))
         }
-        return elements
     }
     
     static func createPhoneNumberElements(fromText text: String, range: NSRange) -> [(range: NSRange, element: ActiveElement)] {
