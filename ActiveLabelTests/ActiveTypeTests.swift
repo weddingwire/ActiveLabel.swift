@@ -13,15 +13,18 @@ extension ActiveElement: Equatable {}
 
 public func ==(a: ActiveElement, b: ActiveElement) -> Bool {
     switch (a, b) {
+    case (.mention(let a), .mention(let b)) where a == b: return true
+    case (.hashtag(let a), .hashtag(let b)) where a == b: return true
     case (.url(let a), .url(let b)) where a == b: return true
-    case (.none, .none): return true
+    case (.custom(let a), .custom(let b)) where a == b: return true
     default: return false
     }
 }
 
 class ActiveTypeTests: XCTestCase {
     
-    let label = ActiveLabel
+    let label = ActiveLabel()
+    let customEmptyType = ActiveType.custom(pattern: "")
     
     var activeElements: [ActiveElement] {
         return label.activeElements.flatMap({$0.1.flatMap({$0.element})})
@@ -30,24 +33,20 @@ class ActiveTypeTests: XCTestCase {
     var currentElementString: String? {
         guard let currentElement = activeElements.first else { return nil }
         switch currentElement {
-        case .url(let url):
-            return url
-        case .phone(let number):
-            return number
-        case .none:
-            return ""
+        case .mention(let mention): return mention
+        case .hashtag(let hashtag): return hashtag
+        case .url(let url, _): return url
+        case .custom(let element): return element
         }
     }
     
     var currentElementType: ActiveType? {
         guard let currentElement = activeElements.first else { return nil }
         switch currentElement {
-        case .url:
-            return .url
-        case .phone:
-            return .phone
-        case .none:
-            return .none
+        case .mention: return .mention
+        case .hashtag: return .hashtag
+        case .url: return .url
+        case .custom: return customEmptyType
         }
     }
     
@@ -72,6 +71,102 @@ class ActiveTypeTests: XCTestCase {
         label.text = "ಠ_ಠ"
         XCTAssertEqual(activeElements.count, 0)
         label.text = "😁"
+        XCTAssertEqual(activeElements.count, 0)
+    }
+    
+    func testMention() {
+        label.text = "@userhandle"
+        XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementString, "userhandle")
+        XCTAssertEqual(currentElementType, ActiveType.mention)
+        
+        label.text = "@userhandle."
+        XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementString, "userhandle")
+        XCTAssertEqual(currentElementType, ActiveType.mention)
+
+        label.text = "@_with_underscores_"
+        XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementString, "_with_underscores_")
+        XCTAssertEqual(currentElementType, ActiveType.mention)
+        
+        label.text = " . @userhandle"
+        XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementString, "userhandle")
+        XCTAssertEqual(currentElementType, ActiveType.mention)
+        
+        label.text = "@user#hashtag"
+        XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementString, "user")
+        XCTAssertEqual(currentElementType, ActiveType.mention)
+        
+        label.text = "@user@mention"
+        XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementString, "user")
+        XCTAssertEqual(currentElementType, ActiveType.mention)
+        
+        label.text = ".@userhandle"
+        XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementString, "userhandle")
+        XCTAssertEqual(currentElementType, ActiveType.mention)
+        
+        label.text = " .@userhandle"
+        XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementString, "userhandle")
+        XCTAssertEqual(currentElementType, ActiveType.mention)
+
+        label.text = "word@mention"
+        XCTAssertEqual(activeElements.count, 0)
+        label.text = "@u"
+        XCTAssertEqual(activeElements.count, 0)
+        label.text = "@."
+        XCTAssertEqual(activeElements.count, 0)
+        label.text = "@"
+        XCTAssertEqual(activeElements.count, 0)
+    }
+    
+    func testHashtag() {
+        label.text = "#somehashtag"
+        XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementString, "somehashtag")
+        XCTAssertEqual(currentElementType, ActiveType.hashtag)
+
+        label.text = "#somehashtag."
+        XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementString, "somehashtag")
+        XCTAssertEqual(currentElementType, ActiveType.hashtag)
+
+        label.text = "#_with_underscores_"
+        XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementString, "_with_underscores_")
+        XCTAssertEqual(currentElementType, ActiveType.hashtag)
+        
+        label.text = " . #somehashtag"
+        XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementString, "somehashtag")
+        XCTAssertEqual(currentElementType, ActiveType.hashtag)
+        
+        label.text = "#some#hashtag"
+        XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementString, "some")
+        XCTAssertEqual(currentElementType, ActiveType.hashtag)
+        
+        label.text = "#some@mention"
+        XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementString, "some")
+        XCTAssertEqual(currentElementType, ActiveType.hashtag)
+        
+        label.text = ".#somehashtag"
+        XCTAssertEqual(activeElements.count, 0)
+        label.text = " .#somehashtag"
+        XCTAssertEqual(activeElements.count, 0)
+        label.text = "word#hashtag"
+        XCTAssertEqual(activeElements.count, 0)
+        label.text = "#h"
+        XCTAssertEqual(activeElements.count, 0)
+        label.text = "#."
+        XCTAssertEqual(activeElements.count, 0)
+        label.text = "#"
         XCTAssertEqual(activeElements.count, 0)
     }
     
@@ -104,29 +199,110 @@ class ActiveTypeTests: XCTestCase {
         label.text = "google.com"
         XCTAssertEqual(activeElements.count, 0)
     }
-    
-    func testPhoneNumbers() {
-        label.text = "1-800-555-5555"
-        XCTAssertEqual(activeElements.count, 1)
-        XCTAssertEqual(currentElementType, ActiveType.phone)
-        
-        label.text = "301.987.6543"
-        XCTAssertEqual(activeElements.count, 1)
-        XCTAssertEqual(currentElementType, ActiveType.phone)
-        
-        label.text = "1-800-COMCAST"
-        XCTAssertEqual(activeElements.count, 1)
-        XCTAssertEqual(currentElementType, ActiveType.phone)
-        
-        label.text = "+1-(800)-555-2468"
-        XCTAssertEqual(activeElements.count, 1)
-        XCTAssertEqual(currentElementType, ActiveType.phone)
 
-        label.text = "8473292"
+    func testCustomType() {
+        let newType = ActiveType.custom(pattern: "\\sare\\b")
+        label.enabledTypes.append(newType)
+
+        label.text = "we are one"
         XCTAssertEqual(activeElements.count, 1)
-        XCTAssertEqual(currentElementType, ActiveType.phone)
+        XCTAssertEqual(currentElementString, "are")
+        XCTAssertEqual(currentElementType, customEmptyType)
+
+        label.text = "are. are"
+        XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementString, "are")
+        XCTAssertEqual(currentElementType, customEmptyType)
+
+        label.text = "helloare are"
+        XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementString, "are")
+        XCTAssertEqual(currentElementType, customEmptyType)
+
+        label.text = "google"
+        XCTAssertEqual(activeElements.count, 0)
+    }
+    
+    func testConfigureLinkAttributes() {
+        // Customize label
+        let newType = ActiveType.custom(pattern: "\\sare\\b")
+        label.customize { label in
+            label.enabledTypes = [newType]
+            
+            // Configure "are" to be system font / bold / 14
+            label.configureLinkAttribute = { type, attributes, isSelected in
+                var atts = attributes
+                if case newType = type {
+                    atts[NSFontAttributeName] = UIFont.boldSystemFont(ofSize: 14)
+                }
+                
+                return atts
+            }
+            label.text = "we are one"
+        }
+        
+        // Find attributed text
+        let range = (label.text! as NSString).range(of: "are")
+        let areText = label.textStorage.attributedSubstring(from: range)
+        
+        // Enumber after attributes and find our font
+        var foundCustomAttributedStyling = false
+        areText.enumerateAttributes(in: NSRange(location: 0, length: areText.length), options: [.longestEffectiveRangeNotRequired], using: { (attributes, range, stop) in
+            foundCustomAttributedStyling = attributes[NSFontAttributeName] as? UIFont == UIFont.boldSystemFont(ofSize: 14)
+        })
+
+        XCTAssertTrue(foundCustomAttributedStyling)
     }
 
+    func testRemoveHandleMention() {
+        label.handleMentionTap({_ in })
+        XCTAssertNotNil(label.handleMentionTap)
+        
+        label.removeHandle(for: .mention)
+        XCTAssertNil(label.mentionTapHandler)
+    }
+    
+    func testRemoveHandleHashtag() {
+        label.handleHashtagTap({_ in })
+        XCTAssertNotNil(label.handleHashtagTap)
+        
+        label.removeHandle(for: .hashtag)
+        XCTAssertNil(label.hashtagTapHandler)
+    }
+    
+    func testRemoveHandleURL() {
+        label.handleURLTap({_ in })
+        XCTAssertNotNil(label.handleURLTap)
+        
+        label.removeHandle(for: .url)
+        XCTAssertNil(label.urlTapHandler)
+    }
+    
+    func testRemoveHandleCustom() {
+        let newType1 = ActiveType.custom(pattern: "\\sare1\\b")
+        let newType2 = ActiveType.custom(pattern: "\\sare2\\b")
+        
+        label.handleCustomTap(for: newType1, handler: {_ in })
+        label.handleCustomTap(for: newType2, handler: {_ in })
+        XCTAssertEqual(label.customTapHandlers.count, 2)
+        
+        label.removeHandle(for: newType1)
+        XCTAssertEqual(label.customTapHandlers.count, 1)
+        
+        label.removeHandle(for: newType2)
+        XCTAssertEqual(label.customTapHandlers.count, 0)
+    }
+
+    func testFiltering() {
+        label.text = "@user #tag"
+        XCTAssertEqual(activeElements.count, 2)
+
+        label.filterMention { $0 != "user" }
+        XCTAssertEqual(activeElements.count, 1)
+
+        label.filterHashtag { $0 != "tag" }
+        XCTAssertEqual(activeElements.count, 0)
+    }
     
     // test for issue https://github.com/optonaut/ActiveLabel.swift/issues/64
     func testIssue64pic() {
@@ -219,6 +395,26 @@ class ActiveTypeTests: XCTestCase {
         XCTAssertEqual(activeElements.count, 2)
         XCTAssertEqual(currentElementString, "are")
         XCTAssertEqual(currentElementType, customEmptyType)
+    }
+    
+    func testPhoneNumbers() {
+        let phoneType = ActiveType.custom(pattern: RegexParser.phonePattern)
+        label.enabledTypes = [phoneType]
+        
+        label.text = "1-800-555-5555"
+        XCTAssertEqual(activeElements.count, 1)
+        
+        label.text = "301.987.6543"
+        XCTAssertEqual(activeElements.count, 1)
+        
+        label.text = "20815"
+        XCTAssertEqual(activeElements.count, 0)
+        
+        label.text = "+1-(800)-555-2468"
+        XCTAssertEqual(activeElements.count, 1)
+        
+        label.text = "8473292 2919482"
+        XCTAssertEqual(activeElements.count, 2)
     }
 
     func testStringTrimming() {
