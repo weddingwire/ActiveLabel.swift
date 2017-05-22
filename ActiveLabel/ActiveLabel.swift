@@ -27,7 +27,7 @@ typealias ElementTuple = (range: NSRange, element: ActiveElement, type: ActiveTy
         didSet { updateTextStorage(parseText: false) }
     }
     
-    open var enabledTypes: [ActiveType] = [.mention, .hashtag, .url]
+    open var enabledTypes: [ActiveType] = [.url, .phone]
     
     open var urlMaximumLength: Int?
     
@@ -101,6 +101,8 @@ typealias ElementTuple = (range: NSRange, element: ActiveElement, type: ActiveTy
             mentionTapHandler = nil
         case .url:
             urlTapHandler = nil
+        case .phone:
+            phoneTapHandler = nil
         case .custom:
             customTapHandlers[type] = nil
         }
@@ -218,6 +220,7 @@ typealias ElementTuple = (range: NSRange, element: ActiveElement, type: ActiveTy
             case .mention(let userHandle): didTapMention(userHandle)
             case .hashtag(let hashtag): didTapHashtag(hashtag)
             case .url(let originalURL, _): didTapStringURL(originalURL)
+            case .phone(let phoneNumber): didTapPhoneNumber(phoneNumber)
             case .custom(let element): didTap(element, for: selectedElement.type)
             }
             
@@ -244,6 +247,7 @@ typealias ElementTuple = (range: NSRange, element: ActiveElement, type: ActiveTy
     internal var mentionTapHandler: ((String) -> ())?
     internal var hashtagTapHandler: ((String) -> ())?
     internal var urlTapHandler: ((URL) -> ())?
+    internal var phoneTapHandler: ((String) -> ())?
     internal var customTapHandlers: [ActiveType : ((String) -> ())] = [:]
     
     fileprivate var mentionFilterPredicate: ((String) -> Bool)?
@@ -328,6 +332,7 @@ typealias ElementTuple = (range: NSRange, element: ActiveElement, type: ActiveTy
             case .mention: attributes[NSForegroundColorAttributeName] = mentionColor
             case .hashtag: attributes[NSForegroundColorAttributeName] = hashtagColor
             case .url: attributes[NSForegroundColorAttributeName] = URLColor
+            case .phone: attributes[NSForegroundColorAttributeName] = URLColor
             case .custom: attributes[NSForegroundColorAttributeName] = customColor[type] ?? defaultCustomColor
             }
             
@@ -407,7 +412,7 @@ typealias ElementTuple = (range: NSRange, element: ActiveElement, type: ActiveTy
             switch type {
             case .mention: selectedColor = mentionSelectedColor ?? mentionColor
             case .hashtag: selectedColor = hashtagSelectedColor ?? hashtagColor
-            case .url: selectedColor = URLSelectedColor ?? URLColor
+            case .url, .phone: selectedColor = URLSelectedColor ?? URLColor
             case .custom:
                 let possibleSelectedColor = customSelectedColor[selectedElement.type] ?? customColor[selectedElement.type]
                 selectedColor = possibleSelectedColor ?? defaultCustomColor
@@ -418,7 +423,7 @@ typealias ElementTuple = (range: NSRange, element: ActiveElement, type: ActiveTy
             switch type {
             case .mention: unselectedColor = mentionColor
             case .hashtag: unselectedColor = hashtagColor
-            case .url: unselectedColor = URLColor
+            case .url, .phone: unselectedColor = URLColor
             case .custom: unselectedColor = customColor[selectedElement.type] ?? defaultCustomColor
             }
             attributes[NSForegroundColorAttributeName] = unselectedColor
@@ -509,6 +514,14 @@ typealias ElementTuple = (range: NSRange, element: ActiveElement, type: ActiveTy
             return
         }
         urlHandler(url)
+    }
+    
+    fileprivate func didTapPhoneNumber(_ phoneNumber: String) {
+        guard let phoneHandler = phoneTapHandler else {
+            delegate?.didSelect(phoneNumber, type: .phone)
+            return
+        }
+        phoneHandler(phoneNumber)
     }
     
     fileprivate func didTap(_ element: String, for type: ActiveType) {

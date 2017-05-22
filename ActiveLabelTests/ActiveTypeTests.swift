@@ -16,6 +16,7 @@ public func ==(a: ActiveElement, b: ActiveElement) -> Bool {
     case (.mention(let a), .mention(let b)) where a == b: return true
     case (.hashtag(let a), .hashtag(let b)) where a == b: return true
     case (.url(let a), .url(let b)) where a == b: return true
+    case (.phone(let a), .phone(let b)) where a == b: return true
     case (.custom(let a), .custom(let b)) where a == b: return true
     default: return false
     }
@@ -36,6 +37,7 @@ class ActiveTypeTests: XCTestCase {
         case .mention(let mention): return mention
         case .hashtag(let hashtag): return hashtag
         case .url(let url, _): return url
+        case .phone(let phone): return phone
         case .custom(let element): return element
         }
     }
@@ -46,13 +48,14 @@ class ActiveTypeTests: XCTestCase {
         case .mention: return .mention
         case .hashtag: return .hashtag
         case .url: return .url
+        case .phone: return .phone
         case .custom: return customEmptyType
         }
     }
     
     override func setUp() {
         super.setUp()
-        label.enabledTypes = [.mention, .hashtag, .url]
+        label.enabledTypes = [.mention, .hashtag, .url, .phone]
         // Put setup code here. This method is called before the invocation of each test method in the class.
     }
     
@@ -197,7 +200,7 @@ class ActiveTypeTests: XCTestCase {
         XCTAssertEqual(currentElementType, ActiveType.url)
 
         label.text = "google.com"
-        XCTAssertEqual(activeElements.count, 0)
+        XCTAssertEqual(activeElements.count, 1)
     }
 
     func testCustomType() {
@@ -375,6 +378,27 @@ class ActiveTypeTests: XCTestCase {
         XCTAssertEqual(currentElementString, "http://www.apple.com")
         XCTAssertEqual(currentElementType, ActiveType.url)
     }
+    
+    func testPhoneNumbers() {
+        label.text = "1-800-555-5555"
+        XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementType, ActiveType.phone)
+        
+        label.text = "301.987.6543"
+        XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementType, ActiveType.phone)
+        
+        label.text = "20815"
+        XCTAssertEqual(activeElements.count, 0)
+        
+        label.text = "+1-(800)-555-2468"
+        XCTAssertEqual(activeElements.count, 1)
+        XCTAssertEqual(currentElementType, ActiveType.phone)
+        
+        label.text = "8473292 2919482"
+        XCTAssertEqual(activeElements.count, 2)
+        XCTAssertEqual(currentElementType, ActiveType.phone)
+    }
 
     func testOnlyCustomEnabled() {
         let newType = ActiveType.custom(pattern: "\\sare\\b")
@@ -397,26 +421,6 @@ class ActiveTypeTests: XCTestCase {
         XCTAssertEqual(currentElementType, customEmptyType)
     }
     
-    func testPhoneNumbers() {
-        let phoneType = ActiveType.custom(pattern: RegexParser.phonePattern)
-        label.enabledTypes = [phoneType]
-        
-        label.text = "1-800-555-5555"
-        XCTAssertEqual(activeElements.count, 1)
-        
-        label.text = "301.987.6543"
-        XCTAssertEqual(activeElements.count, 1)
-        
-        label.text = "20815"
-        XCTAssertEqual(activeElements.count, 0)
-        
-        label.text = "+1-(800)-555-2468"
-        XCTAssertEqual(activeElements.count, 1)
-        
-        label.text = "8473292 2919482"
-        XCTAssertEqual(activeElements.count, 2)
-    }
-
     func testStringTrimming() {
         let text = "Tweet with long url: https://twitter.com/twicket_app/status/649678392372121601 and short url: https://hello.co"
         label.urlMaximumLength = 30
