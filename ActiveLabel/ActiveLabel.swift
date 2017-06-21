@@ -560,7 +560,7 @@ typealias ElementTuple = (range: NSRange, element: ActiveElement, type: ActiveTy
     }
     
     open override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
-        if action == #selector(NSObject.copy) {
+        if action == #selector(copy(_:)) {
             return true
         }
         return false
